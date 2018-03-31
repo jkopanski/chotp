@@ -1,0 +1,27 @@
+name:                chotp
+version:             0.1.0.0
+#synopsis:
+#description:
+homepage:            https://github.com/jkopanski/chotp#readme
+license:             BSD3
+author:              Jakub Kopański
+maintainer:          jkopanski@protonmail.com
+copyright:           Copyright (c) 2018 Jakub Kopański
+category:            Web
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - distributed-process
+  - network-transport-tcp
+
+library:
+  source-dirs:      src
+
+executables:
+  node:
+    main:           Main.hs
+    source-dirs:    node
+    dependencies:
+      - optparse-applicative
