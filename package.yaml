@@ -9,12 +9,23 @@ maintainer:          jkopanski@protonmail.com
 copyright:           Copyright (c) 2018 Jakub Kopański
 category:            Web
 extra-source-files:
-- README.md
+  - README.md
+
+default-extensions:
+  - LambdaCase
+  - FlexibleContexts
+  - FlexibleInstances
+  - OverloadedStrings
 
 dependencies:
   - base >= 4.7 && < 5
   - distributed-process
+  - lifted-async
   - network-transport-tcp
+  - mtl
+  - random
+  - stm
+  - transformers
 
 library:
   source-dirs:      src
@@ -25,3 +36,14 @@ executables:
     source-dirs:    node
     dependencies:
       - optparse-applicative
+
+tests:
+  test:
+    main:           Test.hs
+    source-dirs:    test
+    dependencies:
+      - chotp
+      - tasty
+      - tasty-discover
+      - tasty-quickcheck
+      - QuickCheck
