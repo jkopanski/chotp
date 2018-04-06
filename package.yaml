@@ -12,19 +12,24 @@ extra-source-files:
   - README.md
 
 default-extensions:
+  - DeriveDataTypeable
+  - DeriveGeneric
   - LambdaCase
   - FlexibleContexts
   - FlexibleInstances
-  - OverloadedStrings
+  # - OverloadedStrings
 
 dependencies:
   - base >= 4.7 && < 5
+  - binary
   - distributed-process
+  - distributed-process-p2p
   - lifted-async
   - network-transport-tcp
   - mtl
   - random
   - stm
+  - time
   - transformers
 
 library:
