@@ -5,18 +5,13 @@ import Control.Monad.Reader
 import Data.Time.Clock.POSIX (getPOSIXTime)
 
 data Time = Time
-  { _seconds :: IO Int
+  { _seconds :: !(IO Int)
   }
 
 defaultTime :: Time
 defaultTime = Time
   { _seconds = round <$> getPOSIXTime
   }
-
-class HasTime env where
-  time :: env -> Time
-instance HasTime Time where
-  time = id
 
 class HasSeconds env where
   seconds :: env -> IO Int

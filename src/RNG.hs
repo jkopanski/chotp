@@ -9,11 +9,6 @@ data Rand = Rand
   { _gen  :: !(TVar StdGen)
   }
 
-class HasRand env where
-  rand :: env -> Rand
-instance HasRand Rand where
-  rand = id
-
 class HasGen env where
   gen :: env -> TVar StdGen
 instance HasGen (TVar StdGen) where
