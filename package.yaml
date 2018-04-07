@@ -23,6 +23,7 @@ dependencies:
   - base >= 4.7 && < 5
   - binary
   - distributed-process
+  - distributed-process-lifted
   - distributed-process-p2p
   - lifted-async
   - network-transport-tcp
@@ -39,7 +40,10 @@ executables:
   node:
     main:           Main.hs
     source-dirs:    node
+    ghc-options:
+      -threaded
     dependencies:
+      - chotp
       - optparse-applicative
 
 tests:
