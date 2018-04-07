@@ -7,10 +7,11 @@ data Config = Config
   { _send :: Int
   , _wait :: Int
   , _seed :: Int
+  , _port :: Int
   } deriving (Eq, Show)
 
 config :: Parser Config
-config = Config <$> send <*> wait <*> seed
+config = Config <$> send <*> wait <*> seed <*> port
 
 send :: Parser Int
 send = option auto
@@ -35,6 +36,14 @@ seed = option auto
  <> metavar "S"
  <> value 1234
  <> help "Use S as RNG seed" )
+
+port :: Parser Int
+port = option auto
+  ( long "port"
+ <> short 'p'
+ <> metavar "P"
+ <> value 9500
+ <> help "Port number P" )
 
 options = info (config <**> helper)
   ( fullDesc
