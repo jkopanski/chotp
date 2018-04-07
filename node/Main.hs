@@ -10,48 +10,26 @@ import           Control.Distributed.Process.Node
 import           Data.Semigroup      ((<>))
 import           Options.Applicative (execParser)
 
-import Opts (Config, options)
+import Opts (Config (..), options)
+import qualified Node as Node
+import Msg
 
 host = "127.0.0.1"
-port = "10501"
-
-replyBack :: (ProcessId, String) -> Process ()
-replyBack (sender, msg) = send sender msg
-
-logMessage :: String -> Process ()
-logMessage msg = say $ "handling: " <> msg
-
-sampleTask :: (Int, String) -> Process ()
-sampleTask (t, s) = liftIO (threadDelay (t * 100000)) >> say s
-
-remotable ['sampleTask]
-
-myRemoteTable :: RemoteTable
-myRemoteTable = Main.__remoteTable initRemoteTable
+ports = [9500 .. 9504]
 
 main :: IO ()
 main = do
-  execParser options >>= putStrLn . show
+  opts <- execParser options
+  let port = show $ _port opts
+      seed = _seed opts
+      send = _send opts
+      wait = _wait opts
+      searchPorts = show <$> filter (\p -> p /= _port opts) ports
 
-  P2P.bootstrap "gallium" "10501" (\port -> ("gallium", port)) myRemoteTable [P2P.makeNodeId "localhost:10501"] (forever $ do
-    liftIO $ threadDelay 100000
-    P2P.nsendPeers "myService" ("some", "message"))
-
-    -- us <- getSelfNode
-    -- _ <- spawnLocal $ sampleTask (1 :: Int, "using spawnLocal")
-    -- pid <- spawn us $ $(mkClosure 'sampleTask) (1 :: Int, "using spawn")
-    -- liftIO $ threadDelay 200000
-
-    -- echo <- spawnLocal $ forever $ do
-    --   receiveWait [match logMessage, match replyBack]
-
-    -- say "send some messages!"
-    -- send echo "hello"
-
-    -- self <- getSelfPid
-    -- send echo (self, ("hello" :: String))
-
-    -- m <- expectTimeout 100000 :: Process (Maybe String)
-    -- case m of
-    --   Nothing -> die "nothing came back!"
-    --   Just s -> say $ "got: " <> s <> " back!"
+  P2P.bootstrap
+    host
+    port
+    (const (host, port))
+    initRemoteTable
+    (P2P.makeNodeId <$> ("127.0.0.1:" <>) <$> searchPorts)
+    (Node.main seed send wait)
