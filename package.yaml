@@ -12,6 +12,7 @@ extra-source-files:
   - README.md
 
 default-extensions:
+  - BangPatterns
   - DeriveDataTypeable
   - DeriveGeneric
   - LambdaCase
