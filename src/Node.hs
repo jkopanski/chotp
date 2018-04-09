@@ -20,14 +20,15 @@ import RNG
 import Msg
 import Time
 
-broadcast :: Message -> m ()
-broadcast = undefined
+getChain :: ReaderT Env Process Chain
+getChain = liftIO . readTVarIO =<< asks _chain
 
-generateMsg :: (MonadTime m, MonadRand m) => m Message
+generateMsg :: ReaderT Env Process Message
 generateMsg = do
   val <- next
   time <- getSeconds
-  pure $ Message time val
+  chain <- getChain
+  pure $ Message time val (scaledSum chain)
 
 data Env = Env
   { _chain :: !(TVar Chain)
@@ -42,24 +43,27 @@ instance HasSeconds Env where
 instance HasGen Env where
   gen = gen . _rand
 
-appendMsg :: MonadIO m => Message -> ReaderT Env m ()
+appendMsg :: Message -> ReaderT Env Process ()
 appendMsg msg = do
   tchain <- asks _chain
-  liftIO $ atomically $ modifyTVar' tchain ((:) msg)
+  liftIO $ atomically $ modifyTVar' tchain (msg :)
 
-longer :: Chain -> Chain -> Chain
-longer a b = if length a < length b then b
-                                    else a
+processMsg :: Query -> ReaderT Env Process ()
+processMsg (AppendMsg msg)= do
+  chain <- getChain
+  if canAppend chain msg then appendMsg msg
+                         else pure () -- TODO: request chain update
+processMsg _ = pure ()
 
-replaceChain :: MonadIO m => Chain -> ReaderT Env m ()
+replaceChain :: Chain -> ReaderT Env Process ()
 replaceChain chain = do
+  liftIO $ guard (isValidChain chain)
   tchain <- asks _chain
-  liftIO $ atomically $ modifyTVar' tchain (longer chain)
+  liftIO $ atomically $ modifyTVar' tchain (longerChain chain)
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
 
--- TODO: Take Process to capabilities
 newMsg :: ReaderT Env Process ()
 newMsg = do
   msg <- generateMsg
