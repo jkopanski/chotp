@@ -68,7 +68,7 @@ instance Binary Query
 isQueryChain, isRespChain, isAppendMsg :: Query -> Bool
 isQueryChain x | QueryChain <- x = True
                | otherwise = False
-isRespChain x | (RespChain x) <- x = True
+isRespChain x | (RespChain _) <- x = True
               | otherwise = False
 isAppendMsg x | (AppendMsg _) <- x = True
               | otherwise = False
