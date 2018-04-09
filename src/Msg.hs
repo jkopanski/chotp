@@ -54,8 +54,9 @@ append msg chain = let new = msg : chain
                                           else Nothing
 
 isValidChain :: Chain -> Bool
-isValidChain [] = True
+isValidChain (x:[]) = total x == 0.0
 isValidChain (x:xs) = (total x == scaledSum xs) && isValidChain xs
+isValidChain [] = False
 
 -- | All messages that can be sent between nodes
 data Query

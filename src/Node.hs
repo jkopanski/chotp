@@ -61,7 +61,7 @@ processMsg (RespChain chain) = do
   liftIO $ guard (isValidChain chain)
   modifyChain (longerChain chain)
 
-processmsg _ = pure ()
+processMsg _ = pure ()
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
@@ -71,6 +71,9 @@ newMsg = do
   msg <- generateMsg
   liftIO $ threadDelay 1000000
   lift $ P2P.nsendPeers "iohk" (AppendMsg msg)
+  -- chain <- getChain
+  -- say ("chain: " <> show chain)
+  -- say ("sending: " <> show msg)
 
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
@@ -102,7 +105,7 @@ node isSending = do
 main :: Int -> Int -> Int -> Process ()
 main seed sendTime gracePeriod = do
   rand <- Rand <$> init seed
-  chain <- liftIO $ atomically $ newTVar emptyChain
+  chain <- liftIO $ atomically $ newTVar [initialMsg]
   let env = Env chain defaultTime rand True
 
   -- send and receive
@@ -120,4 +123,6 @@ main seed sendTime gracePeriod = do
   unregister "iohk"
 
   -- show all
-  liftIO . print . show =<< (liftIO $ readTVarIO (_chain env))
+  chain <- liftIO $ readTVarIO $ _chain env
+  (liftIO . print . show) chain
+  liftIO $ print $ "msgs: " <> (show $ length chain )
