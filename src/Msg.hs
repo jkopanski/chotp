@@ -48,6 +48,11 @@ result xs = (length xs - 1, scaledSum xs)
 canAppend :: Chain -> Message -> Bool
 canAppend chain msg = total msg == scaledSum chain
 
+append :: Message -> Chain -> Maybe Chain
+append msg chain = let new = msg : chain
+                   in if isValidChain new then Just new
+                                          else Nothing
+
 isValidChain :: Chain -> Bool
 isValidChain [] = True
 isValidChain (x:xs) = (total x == scaledSum xs) && isValidChain xs

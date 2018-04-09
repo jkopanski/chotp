@@ -4,12 +4,13 @@ import Prelude hiding (init)
 import           Control.Concurrent                 (threadDelay)
 import           Control.Concurrent.STM             ( TVar, atomically
                                                     , modifyTVar', newTVar
-                                                    , readTVarIO, writeTVar
+                                                    , readTVar, readTVarIO, writeTVar
                                                     )
 import           Control.Monad.Reader
 import           Control.Distributed.Process.Lifted ( Process, exit, expect
-                                                    , matchIf
+                                                    , matchAny, handleMessage_
                                                     , receiveTimeout, register
+                                                    , nsend
                                                     , say, spawnLocal
                                                     , unregister
                                                     )
@@ -43,23 +44,24 @@ instance HasSeconds Env where
 instance HasGen Env where
   gen = gen . _rand
 
-appendMsg :: Message -> ReaderT Env Process ()
-appendMsg msg = do
+modifyChain :: (Chain -> Chain) -> ReaderT Env Process ()
+modifyChain f = do
   tchain <- asks _chain
-  liftIO $ atomically $ modifyTVar' tchain (msg :)
+  liftIO $ atomically $ modifyTVar' tchain f
 
 processMsg :: Query -> ReaderT Env Process ()
 processMsg (AppendMsg msg)= do
-  chain <- getChain
-  if canAppend chain msg then appendMsg msg
-                         else pure () -- TODO: request chain update
-processMsg _ = pure ()
-
-replaceChain :: Chain -> ReaderT Env Process ()
-replaceChain chain = do
-  liftIO $ guard (isValidChain chain)
   tchain <- asks _chain
-  liftIO $ atomically $ modifyTVar' tchain (longerChain chain)
+  chain <- liftIO $ readTVarIO tchain
+  case append msg chain of
+    Just new -> liftIO $ atomically $ writeTVar tchain new
+    Nothing -> lift $ P2P.nsendPeers "iohk" QueryChain
+
+processMsg (RespChain chain) = do
+  liftIO $ guard (isValidChain chain)
+  modifyChain (longerChain chain)
+
+processmsg _ = pure ()
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
@@ -74,9 +76,7 @@ processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
   env <- ask
   receiveTimeout 0
-    [ matchIf isAppendMsg (\(AppendMsg msg) -> runNode (appendMsg msg) env)
-    , matchIf isRespChain (\(RespChain chain) -> runNode (replaceChain chain) env)
-    ]
+    [ matchAny (\msg -> handleMessage_ msg (\m -> runNode (processMsg m) env)) ]
 
 -- | idea is as follows:
 -- 1. check mailbox for new messages,
