@@ -8,7 +8,7 @@ import           Control.Concurrent.STM             ( TVar, atomically
                                                     )
 import           Control.Monad.Reader
 import           Control.Distributed.Process.Lifted ( Process, exit, expect
-                                                    , matchAny, handleMessage_
+                                                    , matchAny, matchIf, handleMessage_
                                                     , receiveTimeout, register
                                                     , nsend
                                                     , say, spawnLocal
@@ -55,13 +55,17 @@ processMsg (AppendMsg msg)= do
   chain <- liftIO $ readTVarIO tchain
   case append msg chain of
     Just new -> liftIO $ atomically $ writeTVar tchain new
-    Nothing -> lift $ P2P.nsendPeers "iohk" QueryChain
+    Nothing -> do
+      lift $ P2P.nsendPeers "iohk" QueryChain
+      lift $ say "request chain"
 
 processMsg (RespChain chain) = do
   liftIO $ guard (isValidChain chain)
   modifyChain (longerChain chain)
 
-processMsg _ = pure ()
+processMsg QueryChain = do
+  chain <- getChain
+  lift $ P2P.nsendPeers "iohk" (RespChain chain)
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
@@ -75,15 +79,32 @@ newMsg = do
   -- say ("chain: " <> show chain)
   -- say ("sending: " <> show msg)
 
+appendableMsg :: Chain -> Query -> Bool
+appendableMsg chain (AppendMsg msg) = canAppend chain msg
+appendableMsg _ _ = False
+
+dropMsg :: Query -> Process ()
+dropMsg msg = do
+  say ("useless: " <> show msg)
+  P2P.nsendPeers "iohk" QueryChain
+
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
   env <- ask
+  chain <- getChain
   receiveTimeout 0
-    [ matchAny (\msg -> handleMessage_ msg (\m -> runNode (processMsg m) env)) ]
+    [ matchIf (appendableMsg chain) (process env) -- | append all msgs first
+    , matchIf isRespChain (process env)           -- | check if we have longer chains in queue
+    , matchIf isQueryChain (process env)          -- | respond with our chain
+    , matchAny (\msg -> handleMessage_ msg dropMsg) -- | rest
+    ]
+
+    where process :: Env -> Query -> Process ()
+          process e q = runNode (processMsg q) e
 
 -- | idea is as follows:
 -- 1. check mailbox for new messages,
---    process then until it is empty
+--    process them until mbox is empty
 -- 2. send new message
 node :: Bool -> ReaderT Env Process ()
 node isSending = do
