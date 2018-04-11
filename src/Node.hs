@@ -1,17 +1,20 @@
 module Node where
 
-import Prelude hiding (init)
+import Prelude hiding (init, pred)
 import           Control.Concurrent                 (threadDelay)
 import           Control.Concurrent.STM             ( TVar, atomically
                                                     , modifyTVar', newTVar
                                                     , readTVar, readTVarIO, writeTVar
                                                     )
 import           Control.Monad.Reader
-import           Control.Distributed.Process.Lifted ( Process, exit, expect
+import           Control.Distributed.Process.Lifted ( Process, ReceivePort, SendPort
+                                                    , exit, expect
+                                                    , getSelfPid
                                                     , matchAny, matchIf, handleMessage_
                                                     , receiveTimeout, register
-                                                    , nsend
-                                                    , say, spawnLocal
+                                                    , newChan, nsend
+                                                    , receiveChan
+                                                    , say, send, sendChan, spawnLocal
                                                     , unregister
                                                     )
 import qualified Control.Distributed.Backend.P2P as P2P
@@ -50,22 +53,34 @@ modifyChain f = do
   liftIO $ atomically $ modifyTVar' tchain f
 
 processMsg :: Query -> ReaderT Env Process ()
-processMsg (AppendMsg msg)= do
+processMsg (AppendMsg msg pid)= do
   tchain <- asks _chain
   chain <- liftIO $ readTVarIO tchain
+  say "processing msg..."
   case append msg chain of
-    Just new -> liftIO $ atomically $ writeTVar tchain new
+    Just new -> do
+      say "appending"
+      liftIO $ atomically $ writeTVar tchain new
     Nothing -> do
-      lift $ P2P.nsendPeers "iohk" QueryChain
-      lift $ say "request chain"
+      if total msg < scaledSum chain
+         -- if total msg < scaledSum chain
+         -- the other node has a problem, we don't ;)
+         then pure ()
+         -- no sense in going forward,
+         -- update the chain first
+          else do
+            (sendChain, recChain) <- lift newChan
+            lift $ send pid (QueryChain sendChain)
+            say "waiting for chain..."
+            newChain <- lift $ receiveChan recChain
+            say "got new chain"
+            if isValidChain newChain
+               then modifyChain (longerChain newChain)
+               else pure ()
 
-processMsg (RespChain chain) = do
-  liftIO $ guard (isValidChain chain)
-  modifyChain (longerChain chain)
-
-processMsg QueryChain = do
+processMsg (QueryChain sendChain) = do
   chain <- getChain
-  lift $ P2P.nsendPeers "iohk" (RespChain chain)
+  lift $ sendChan sendChain chain
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
@@ -73,30 +88,26 @@ runNode = runReaderT
 newMsg :: ReaderT Env Process ()
 newMsg = do
   msg <- generateMsg
+  lift . P2P.nsendPeers "iohk" . AppendMsg msg =<< lift getSelfPid
   liftIO $ threadDelay 1000000
-  lift $ P2P.nsendPeers "iohk" (AppendMsg msg)
-  -- chain <- getChain
-  -- say ("chain: " <> show chain)
-  -- say ("sending: " <> show msg)
 
 appendableMsg :: Chain -> Query -> Bool
-appendableMsg chain (AppendMsg msg) = canAppend chain msg
+appendableMsg chain (AppendMsg msg _) = canAppend chain msg
 appendableMsg _ _ = False
 
 dropMsg :: Query -> Process ()
-dropMsg msg = do
-  say ("useless: " <> show msg)
-  P2P.nsendPeers "iohk" QueryChain
+dropMsg msg = pure ()
 
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
   env <- ask
   chain <- getChain
   receiveTimeout 0
-    [ matchIf (appendableMsg chain) (process env) -- | append all msgs first
-    , matchIf isRespChain (process env)           -- | check if we have longer chains in queue
-    , matchIf isQueryChain (process env)          -- | respond with our chain
-    , matchAny (\msg -> handleMessage_ msg dropMsg) -- | rest
+    [ matchAny (\msg -> handleMessage_ msg (\m -> process env m))
+    --   matchIf (appendableMsg chain) (process env) -- | append all msgs first
+    -- , matchIf isRespChain (process env)           -- | check if we have longer chains in queue
+    -- , matchIf isQueryChain (process env)          -- | respond with our chain
+    -- , matchAny (\msg -> handleMessage_ msg dropMsg) -- | rest
     ]
 
     where process :: Env -> Query -> Process ()
@@ -126,8 +137,8 @@ node isSending = do
 main :: Int -> Int -> Int -> Process ()
 main seed sendTime gracePeriod = do
   rand <- Rand <$> init seed
-  chain <- liftIO $ atomically $ newTVar [initialMsg]
-  let env = Env chain defaultTime rand True
+  tchain <- liftIO $ atomically $ newTVar [initialMsg]
+  let env = Env tchain defaultTime rand True
 
   -- send and receive
   txrx <- spawnLocal (runNode (forever $ node True) env)

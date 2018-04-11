@@ -4,6 +4,7 @@ import Data.Binary     (Binary)
 import Data.Time.Clock.System (getSystemTime, systemSeconds)
 import Data.Typeable   (Typeable)
 import GHC.Generics    (Generic)
+import Control.Distributed.Process.Lifted (ProcessId, SendPort)
 
 type Timestamp = Integer
 data Message = Message
@@ -50,8 +51,8 @@ canAppend chain msg = total msg == scaledSum chain
 
 append :: Message -> Chain -> Maybe Chain
 append msg chain = let new = msg : chain
-                   in if isValidChain new then Just new
-                                          else Nothing
+                    in if isValidChain new then Just new
+                                           else Nothing
 
 isValidChain :: Chain -> Bool
 isValidChain (x:[]) = total x == 0.0
@@ -60,17 +61,17 @@ isValidChain [] = False
 
 -- | All messages that can be sent between nodes
 data Query
-  = QueryChain
-  | RespChain Chain
-  | AppendMsg Message
+  = QueryChain (SendPort Chain)
+  -- | RespChain Chain
+  | AppendMsg Message ProcessId
   deriving (Eq, Show, Generic, Typeable)
 instance Binary Query
 
-isQueryChain, isRespChain, isAppendMsg :: Query -> Bool
-isQueryChain x | QueryChain <- x = True
+isQueryChain, isAppendMsg :: Query -> Bool
+isQueryChain x | (QueryChain _) <- x = True
                | otherwise = False
-isRespChain x | (RespChain _) <- x = True
-              | otherwise = False
-isAppendMsg x | (AppendMsg _) <- x = True
+-- isRespChain x | (RespChain _) <- x = True
+--               | otherwise = False
+isAppendMsg x | (AppendMsg _ _) <- x = True
               | otherwise = False
 
