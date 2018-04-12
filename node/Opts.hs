@@ -4,14 +4,15 @@ import Data.Semigroup      ((<>))
 import Options.Applicative
 
 data Config = Config
-  { _send :: Int
-  , _wait :: Int
-  , _seed :: Int
-  , _port :: Int
+  { _send     :: Int
+  , _wait     :: Int
+  , _seed     :: Int
+  , _port     :: Int
+  , _throttle :: Bool
   } deriving (Eq, Show)
 
 config :: Parser Config
-config = Config <$> send <*> wait <*> seed <*> port
+config = Config <$> send <*> wait <*> seed <*> port <*> throttle
 
 send :: Parser Int
 send = option auto
@@ -45,8 +46,13 @@ port = option auto
  <> value 9500
  <> help "Port number P" )
 
+throttle :: Parser Bool
+throttle = switch
+  ( long "throttle"
+ <> short 't'
+ <> help "Limit message sending to 1 per second" )
+
 options = info (config <**> helper)
   ( fullDesc
  <> progDesc "IOHK test task"
  <> header "node - send and receive messages" )
-

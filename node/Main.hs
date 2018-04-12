@@ -24,6 +24,7 @@ main = do
       seed = _seed opts
       send = _send opts
       wait = _wait opts
+      throttle = _throttle opts
       searchPorts = show <$> filter (\p -> p /= _port opts) ports
 
   P2P.bootstrap
@@ -32,4 +33,4 @@ main = do
     (const (host, port))
     initRemoteTable
     (P2P.makeNodeId <$> ("127.0.0.1:" <>) <$> searchPorts)
-    (Node.main seed send wait)
+    (Node.main seed send wait throttle)

@@ -86,11 +86,12 @@ processMsg (QueryChain sendChain) = do
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
 
-newMsg :: ReaderT Env Process ()
-newMsg = do
+newMsg :: Bool -> ReaderT Env Process ()
+newMsg throttle = do
   msg <- generateMsg
   liftP $ P2P.nsendPeers "iohk" . AppendMsg msg =<< getSelfPid
-  -- liftIO $ threadDelay 1000000
+  if throttle then liftIO $ threadDelay 1000000
+              else pure ()
 
 appendableMsg :: Chain -> Query -> Bool
 appendableMsg chain (AppendMsg msg _) = canAppend chain msg
@@ -115,8 +116,8 @@ processMBox = do
 -- 1. check mailbox for new messages,
 --    process them until mbox is empty
 -- 2. send new message
-node :: Bool -> ReaderT Env Process ()
-node isSending = do
+node :: Bool -> Bool-> ReaderT Env Process ()
+node isSending throttle = do
   let while :: Monad m => (a -> Bool) -> m a -> m ()
       while pred m = do
         m >>= \v -> case pred v of
@@ -130,23 +131,23 @@ node isSending = do
   -- process all pending messages
   while isJust processMBox
   -- generate and send new message
-  when isSending newMsg
+  when isSending (newMsg throttle)
 
-main :: Int -> Int -> Int -> Process ()
-main seed sendTime gracePeriod = do
+main :: Int -> Int -> Int -> Bool -> Process ()
+main seed sendTime gracePeriod throttle = do
   rand <- Rand <$> init seed
   tchain <- liftIO $ atomically $ newTVar [initialMsg]
   let env = Env tchain defaultTime rand True
 
   -- send and receive
-  txrx <- spawnLocal (runNode (forever $ node True) env)
+  txrx <- spawnLocal (runNode (forever $ node True throttle) env)
   register "iohk" txrx
   liftIO $ threadDelay (sendTime * 1000000)
   exit txrx "timeout"
   unregister "iohk"
 
   -- just receive
-  rx <- spawnLocal (runNode (forever $ node False) env)
+  rx <- spawnLocal (runNode (forever $ node False throttle) env)
   register "iohk" rx
   liftIO $ threadDelay (gracePeriod * 1000000)
   exit rx "grace period"
