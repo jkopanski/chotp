@@ -14,23 +14,21 @@ import Opts (Config (..), options)
 import qualified Node as Node
 import Msg
 
-host = "127.0.0.1"
-ports = [9500 .. 9504]
-
 main :: IO ()
 main = do
   opts <- execParser options
   let port = show $ _port opts
+      host = _host opts
       seed = _seed opts
       send = _send opts
       wait = _wait opts
       throttle = _throttle opts
-      searchPorts = show <$> filter (\p -> p /= _port opts) ports
+      peers = _peers opts
 
   P2P.bootstrap
     host
     port
     (const (host, port))
     initRemoteTable
-    (P2P.makeNodeId <$> ("127.0.0.1:" <>) <$> searchPorts)
+    (P2P.makeNodeId <$> peers)
     (Node.main seed send wait throttle)
