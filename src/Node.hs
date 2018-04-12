@@ -17,6 +17,7 @@ import           Control.Distributed.Process.Lifted ( Process, ReceivePort, Send
                                                     , say, send, sendChan, spawnLocal
                                                     , unregister
                                                     )
+import           Control.Distributed.Process.Lifted.Class
 import qualified Control.Distributed.Backend.P2P as P2P
 import           Data.Semigroup ((<>))
 
@@ -69,10 +70,10 @@ processMsg (AppendMsg msg pid)= do
          -- no sense in going forward,
          -- update the chain first
           else do
-            (sendChain, recChain) <- lift newChan
-            lift $ send pid (QueryChain sendChain)
+            (sendChain, recChain) <- newChan
+            send pid (QueryChain sendChain)
             say "waiting for chain..."
-            newChain <- lift $ receiveChan recChain
+            newChain <- receiveChan recChain
             say "got new chain"
             if isValidChain newChain
                then modifyChain (longerChain newChain)
@@ -80,7 +81,7 @@ processMsg (AppendMsg msg pid)= do
 
 processMsg (QueryChain sendChain) = do
   chain <- getChain
-  lift $ sendChan sendChain chain
+  sendChan sendChain chain
 
 runNode :: ReaderT Env Process () -> Env -> Process ()
 runNode = runReaderT
@@ -88,15 +89,12 @@ runNode = runReaderT
 newMsg :: ReaderT Env Process ()
 newMsg = do
   msg <- generateMsg
-  lift . P2P.nsendPeers "iohk" . AppendMsg msg =<< lift getSelfPid
-  liftIO $ threadDelay 1000000
+  liftP $ P2P.nsendPeers "iohk" . AppendMsg msg =<< getSelfPid
+  -- liftIO $ threadDelay 1000000
 
 appendableMsg :: Chain -> Query -> Bool
 appendableMsg chain (AppendMsg msg _) = canAppend chain msg
 appendableMsg _ _ = False
-
-dropMsg :: Query -> Process ()
-dropMsg msg = pure ()
 
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
