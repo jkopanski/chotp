@@ -83,9 +83,6 @@ processMsg (QueryChain sendChain) = do
   chain <- getChain
   sendChan sendChain chain
 
-runNode :: ReaderT Env Process () -> Env -> Process ()
-runNode = runReaderT
-
 newMsg :: Bool -> ReaderT Env Process ()
 newMsg throttle = do
   msg <- generateMsg
@@ -93,24 +90,12 @@ newMsg throttle = do
   if throttle then liftIO $ threadDelay 1000000
               else pure ()
 
-appendableMsg :: Chain -> Query -> Bool
-appendableMsg chain (AppendMsg msg _) = canAppend chain msg
-appendableMsg _ _ = False
-
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
   env <- ask
-  chain <- getChain
-  receiveTimeout 0
-    [ matchAny (\msg -> handleMessage_ msg (\m -> process env m))
-    --   matchIf (appendableMsg chain) (process env) -- | append all msgs first
-    -- , matchIf isRespChain (process env)           -- | check if we have longer chains in queue
-    -- , matchIf isQueryChain (process env)          -- | respond with our chain
-    -- , matchAny (\msg -> handleMessage_ msg dropMsg) -- | rest
-    ]
-
+  receiveTimeout 0 [ matchAny (\msg -> handleMessage_ msg (\m -> process env m)) ]
     where process :: Env -> Query -> Process ()
-          process e q = runNode (processMsg q) e
+          process e q = runReaderT (processMsg q) e
 
 -- | idea is as follows:
 -- 1. check mailbox for new messages,
@@ -140,14 +125,14 @@ main seed sendTime gracePeriod throttle = do
   let env = Env tchain defaultTime rand True
 
   -- send and receive
-  txrx <- spawnLocal (runNode (forever $ node True throttle) env)
+  txrx <- spawnLocal (runReaderT (forever $ node True throttle) env)
   register "iohk" txrx
   liftIO $ threadDelay (sendTime * 1000000)
   exit txrx "timeout"
   unregister "iohk"
 
   -- just receive
-  rx <- spawnLocal (runNode (forever $ node False throttle) env)
+  rx <- spawnLocal (runReaderT (forever $ node False throttle) env)
   register "iohk" rx
   liftIO $ threadDelay (gracePeriod * 1000000)
   exit rx "grace period"
