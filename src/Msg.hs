@@ -1,7 +1,6 @@
 module Msg where
 
 import Data.Binary     (Binary)
-import Data.Time.Clock.System (getSystemTime, systemSeconds)
 import Data.Typeable   (Typeable)
 import GHC.Generics    (Generic)
 import Control.Distributed.Process.Lifted (ProcessId, SendPort)
@@ -38,7 +37,7 @@ longerChain a b = if length a < length b then b
                                          else a
 
 mac :: Double -> Int -> Double -> Double
-mac acc multiplier x = acc + ((fromIntegral multiplier) * x)
+mac acc multiplier x = acc + (fromIntegral multiplier * x)
 
 scaledSum :: Chain -> Double
 scaledSum xs = foldl (\g x !i -> mac (g (i + 1)) i (value x)) (const 0) xs 0
@@ -55,7 +54,7 @@ append msg chain = let new = msg : chain
                                            else Nothing
 
 isValidChain :: Chain -> Bool
-isValidChain (x:[]) = total x == 0.0
+isValidChain [x] = total x == 0.0
 isValidChain (x:xs) = (total x == scaledSum xs) && isValidChain xs
 isValidChain [] = False
 

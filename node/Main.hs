@@ -1,4 +1,3 @@
-{-# language TemplateHaskell #-}
 module Main where
 
 import qualified Control.Distributed.Backend.P2P as P2P
@@ -7,7 +6,7 @@ import           Data.Semigroup ((<>))
 import           Options.Applicative (execParser)
 
 import Opts (Config (..), options)
-import qualified Node as Node
+import qualified Node
 
 main :: IO ()
 main = do

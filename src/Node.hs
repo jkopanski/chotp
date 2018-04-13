@@ -62,7 +62,7 @@ processMsg (AppendMsg msg pid)= do
     Just new -> do
       say "appending"
       liftIO $ atomically $ writeTVar tchain new
-    Nothing -> do
+    Nothing ->
       -- could really used an alternative
       if total msg < scaledSum chain
          -- if total msg < scaledSum chain
@@ -98,7 +98,7 @@ newMsg throttle = do
 processMBox :: ReaderT Env Process (Maybe ())
 processMBox = do
   env <- ask
-  receiveTimeout 0 [ matchAny (\msg -> handleMessage_ msg (\m -> process env m)) ]
+  receiveTimeout 0 [ matchAny (\msg -> handleMessage_ msg (process env)) ]
     where process :: Env -> Query -> Process ()
           process e q = runReaderT (processMsg q) e
 
@@ -109,10 +109,9 @@ processMBox = do
 node :: Bool -> Bool-> ReaderT Env Process ()
 node isSending throttle = do
   let while :: Monad m => (a -> Bool) -> m a -> m ()
-      while pred m = do
-        m >>= \v -> case pred v of
-          True -> while pred m
-          False -> pure ()
+      while pred m =
+        m >>= \v -> if pred v then while pred m
+                              else pure ()
 
       isJust :: Maybe a -> Bool
       isJust ma | (Just _) <- ma = True

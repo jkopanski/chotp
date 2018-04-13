@@ -75,6 +75,7 @@ host = strOption
  <> value "127.0.0.1"
  <> help "Bind to HOST" )
 
+options :: ParserInfo Config
 options = info (config <**> helper)
   ( fullDesc
  <> progDesc "IOHK test task"

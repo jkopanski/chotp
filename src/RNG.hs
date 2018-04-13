@@ -1,6 +1,5 @@
 module RNG where
 
-import Control.Concurrent.Async.Lifted.Safe
 import Control.Concurrent.STM (TVar, atomically, newTVar, readTVar, writeTVar)
 import Control.Monad.Reader
 import System.Random hiding (next)
