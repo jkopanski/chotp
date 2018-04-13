@@ -13,7 +13,7 @@ In case of a mismatch node will try to update it's chain from peer,
 before attempting any other actions,
 but only if result of a peer chain is higher.
 
-## Runing program
+## Running program
 Executable is called `node`.
 Beside required set of parameters it can additionally take these parameters.
 ```shell
