@@ -65,6 +65,7 @@ peer = strArgument
   ( metavar "PEER"
  <> help "Address of peer node" )
 
+peers :: Parser [String]
 peers = some peer
 
 host :: Parser String

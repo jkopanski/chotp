@@ -4,15 +4,15 @@ import Prelude hiding (init, pred)
 import           Control.Concurrent                 (threadDelay)
 import           Control.Concurrent.STM             ( TVar, atomically
                                                     , modifyTVar', newTVar
-                                                    , readTVar, readTVarIO, writeTVar
+                                                    , readTVarIO, writeTVar
                                                     )
 import           Control.Monad.Reader
-import           Control.Distributed.Process.Lifted ( Process, ReceivePort, SendPort
-                                                    , exit, expect
+import           Control.Distributed.Process.Lifted ( Process
+                                                    , exit
                                                     , getSelfPid
-                                                    , matchAny, matchIf, handleMessage_
+                                                    , matchAny, handleMessage_
                                                     , receiveTimeout, register
-                                                    , newChan, nsend
+                                                    , newChan
                                                     , receiveChan
                                                     , say, send, sendChan, spawnLocal
                                                     , unregister
@@ -39,7 +39,7 @@ data Env = Env
   { _chain :: !(TVar Chain)
   , _time :: !Time
   , _rand :: !Rand
-  , _send :: Bool
+  , _send :: !Bool
   }
 
 instance HasSeconds Env where
@@ -63,6 +63,7 @@ processMsg (AppendMsg msg pid)= do
       say "appending"
       liftIO $ atomically $ writeTVar tchain new
     Nothing -> do
+      -- could really used an alternative
       if total msg < scaledSum chain
          -- if total msg < scaledSum chain
          -- the other node has a problem, we don't ;)
