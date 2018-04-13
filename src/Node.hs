@@ -13,7 +13,7 @@ import           Control.Distributed.Process.Lifted ( Process
                                                     , matchAny, handleMessage_
                                                     , receiveTimeout, register
                                                     , newChan
-                                                    , receiveChan
+                                                    , receiveChanTimeout
                                                     , say, send, sendChan, spawnLocal
                                                     , unregister
                                                     )
@@ -74,11 +74,15 @@ processMsg (AppendMsg msg pid)= do
             (sendChain, recChain) <- newChan
             send pid (QueryChain sendChain)
             say "waiting for chain..."
-            newChain <- receiveChan recChain
+            -- we limit the time so that in case of failure we keep progressing
+            mchain <- receiveChanTimeout 1000000 recChain
             say "got new chain"
-            if isValidChain newChain
-               then modifyChain (longerChain newChain)
-               else pure ()
+            process mchain
+
+  where process :: Maybe Chain -> ReaderT Env Process ()
+        process (Just c) = if isValidChain c then modifyChain (longerChain c)
+                                             else pure ()
+        process Nothing = pure ()
 
 processMsg (QueryChain sendChain) = do
   chain <- getChain
