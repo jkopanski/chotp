@@ -141,5 +141,4 @@ main seed sendTime gracePeriod throttle = do
 
   -- show all
   chain <- liftIO $ readTVarIO $ _chain env
-  (liftIO . print . show) chain
-  liftIO $ print $ "msgs: " <> (show $ length chain )
+  (liftIO . print . show . result) chain
